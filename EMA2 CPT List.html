@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>EMA2 CPT List</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; background: #f0f2f5; margin: 0; }
+    h1   { font-size: 1.35em; color: #232f3e; margin: 0 0 16px 0; }
+
+    /* ── Cards ── */
+    .card {
+      background: #fff; border-radius: 6px; padding: 16px;
+      margin-bottom: 14px; border: 1px solid #ddd; box-shadow: 0 1px 3px rgba(0,0,0,.06);
+    }
+    .card h3 { margin: 0 0 12px 0; font-size: .95em; color: #232f3e; }
+
+    /* ── Upload rows ── */
+    .upload-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+    .upload-row label { font-size: .86em; color: #555; min-width: 250px; }
+    input[type="file"] { font-size: .85em; }
+    .ok  { color: #2e7d32; font-size: .82em; }
+    .err { color: #c62828; font-size: .82em; }
+
+    /* ── Buttons ── */
+    button {
+      padding: 7px 15px; border: none; border-radius: 4px;
+      cursor: pointer; font-size: .88em; color: #fff; font-weight: 500;
+    }
+    button:hover    { opacity: .87; }
+    button:disabled { opacity: .4; cursor: not-allowed; }
+    .btn-shift { background: #232f3e; }
+    #btn-day   { background: #d17000; }
+    #btn-night { background: #232f3e; }
+    .btn-sm {
+      background: #fff; color: #333; border: 1px solid #bbb;
+      padding: 5px 12px; font-size: .82em;
+    }
+    .btn-sm:hover:not(:disabled) { background: #f0f0f0; opacity: 1; }
+    #btn-gen   { background: #2a6e3f; margin-top: 4px; }
+    #btn-print { background: #4a6fa5; }
+    #btn-csv   { background: #6a4fa5; }
+    #btn-rm-toggle { background: #b05a00; }
+
+    /* ── CPT pill checkboxes ── */
+    .cpt-pills { display: flex; flex-wrap: wrap; gap: 7px; margin: 12px 0 16px; min-height: 34px; align-items: center; }
+    .cpt-pill-cb { display: none; }
+    .cpt-pill-cb + label {
+      display: inline-block; padding: 5px 13px; border: 1px solid #bbb;
+      border-radius: 20px; cursor: pointer; font-size: .85em; color: #333;
+      background: #f5f5f5; user-select: none; transition: background .12s, color .12s;
+    }
+    .cpt-pill-cb:checked + label { background: #232f3e; color: #fff; border-color: #232f3e; }
+    .cpt-pill-cb + label:hover   { background: #e0e0e0; }
+    .cpt-pill-cb:checked + label:hover { background: #3d5266; opacity: 1; }
+    .pill-hint { font-size: .82em; color: #aaa; }
+    .quick-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
+
+    /* ── Controls ── */
+    .controls { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; align-items: center; }
+
+    /* ── Status ── */
+    #status { font-size: .88em; color: #555; margin-bottom: 10px; min-height: 18px; }
+
+    /* ── Table ── */
+    table { border-collapse: collapse; width: 100%; background: #fff; font-size: .82em; }
+    th, td { padding: 6px 10px; border: 1px solid #ddd; vertical-align: middle; }
+    th { background: #232f3e; color: #fff; text-align: left; white-space: nowrap; font-size: .83em; }
+
+    td.route-cell {
+      font-weight: 700; white-space: nowrap; vertical-align: middle;
+      border-right: 3px solid #4a6fa5; background: #f7f9ff;
+      font-size: .85em; padding: 8px 10px;
+    }
+    td.filter-cell { color: #444; font-size: .8em; }
+    td.loc-box     { background: #e8f0fe; font-weight: 600; }
+    td.loc-flat    { background: #e6f4ea; font-weight: 600; }
+    td.loc-bg      { background: #fef9e0; font-weight: 600; }
+    td.loc-other   { background: #fafafa; }
+
+    tr.route-start td           { border-top: 2px solid #999; }
+    tr.route-start td.route-cell{ border-top: 2px solid #4a6fa5; }
+
+    tr.cpt-div td {
+      background: #232f3e !important; color: #fff;
+      font-weight: 700; font-size: .9em; padding: 6px 10px; letter-spacing: .04em;
+    }
+
+    tr.data-row:nth-child(even) td:not(.route-cell) { background-color: #f7f9ff; }
+    tr.data-row:nth-child(even) td.loc-box  { background: #dde8fd; }
+    tr.data-row:nth-child(even) td.loc-flat { background: #d8f0dc; }
+    tr.data-row:nth-child(even) td.loc-bg   { background: #faf2cc; }
+
+    /* ── Print ── */
+    #print-header { display: none; }
+    @media print {
+      body { background: #fff; padding: 0; }
+      .card, .controls, #status { display: none !important; }
+      #print-header { display: block; margin-bottom: 10px; }
+      #print-header h2 { font-size: 1.1em; margin: 0; color: #232f3e; }
+      table { font-size: .72em; }
+      th, td.route-cell { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      td.loc-box  { background: #e8f0fe !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      td.loc-flat { background: #e6f4ea !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      td.loc-bg   { background: #fef9e0 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      tr.cpt-div td { background: #232f3e !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="print-header">
+  <h2>EMA2 CPT List</h2>
+</div>
+
+<!-- ── Step 1: Upload ── -->
+<div class="card">
+  <h3>Step 1 &mdash; Upload your files</h3>
+  <div class="upload-row">
+    <label>&#128230; Outbound Dock Manager CSV &nbsp;<em>(download from SSP)</em>:</label>
+    <input type="file" id="dockFile" accept=".csv" onchange="onFile('dock')" />
+    <span id="dock-status"></span>
+  </div>
+  <div class="upload-row">
+    <label>&#128202; EMA2 Allocation Details CSV &nbsp;<em>(download from STEM)</em>:</label>
+    <input type="file" id="dataFile" accept=".csv" onchange="onFile('data')" />
+    <span id="data-status"></span>
+  </div>
+</div>
+
+<!-- ── Step 2: CPT tick picker ── -->
+<div class="card">
+  <h3>Step 2 &mdash; Select CPT times</h3>
+
+  <div class="quick-row">
+    <button id="btn-day"   onclick="selectShift('day')"   disabled>&#9728;&nbsp; Day shift &nbsp;(07:00&ndash;18:00)</button>
+    <button id="btn-night" onclick="selectShift('night')" disabled>&#9790;&nbsp; Night shift (18:00&ndash;05:00)</button>
+    <button class="btn-sm" id="btn-all"  onclick="selectAll(true)"  disabled>Select all</button>
+    <button class="btn-sm" id="btn-none" onclick="selectAll(false)" disabled>Clear all</button>
+  </div>
+
+  <div class="cpt-pills" id="cpt-pills">
+    <span class="pill-hint">Load both files above to see available CPT times</span>
+  </div>
+
+  <button id="btn-gen" onclick="generate()" disabled>&#9654;&nbsp; Generate CPT list</button>
+</div>
+
+<!-- ── Step 3: Royal Mail route filter (shown after generation) ── -->
+<div class="card" id="rm-card" style="display:none">
+  <h3>&#128231;&nbsp; Royal Mail routes &mdash; tick to include on list</h3>
+  <div class="quick-row">
+    <button class="btn-sm" id="btn-rm-all"  onclick="selectAllRM(true)">Select all</button>
+    <button class="btn-sm" id="btn-rm-none" onclick="selectAllRM(false)">Clear all</button>
+  </div>
+  <div class="cpt-pills" id="rm-pills"></div>
+</div>
+
+<!-- ── Print / Download ── -->
+<div class="controls">
+  <button id="btn-print" onclick="window.print()">&#128424;&nbsp; Print</button>
+  <button id="btn-csv" onclick="downloadCSV()" disabled>&#11015;&nbsp; Download CSV</button>
+</div>
+
+<div id="status">Upload both CSV files to get started.</div>
+<div id="output"></div>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+//  Configuration
+// ══════════════════════════════════════════════════════════════
+
+// Add internal route codes here to hide them, e.g. 'EMA2-DWR1'
+var EXCLUDED = [];
+
+// Only show STACKING_AREA rows whose Resource Label starts with these.
+// Anything else (Manual Sort, JACKPOT FIXER, etc.) is filtered out.
+var LABEL_PREFIXES = ['BOX-', 'FLAT-', 'BG-'];
+
+// ══════════════════════════════════════════════════════════════
+//  State
+// ══════════════════════════════════════════════════════════════
+var dockData  = null;
+var allocData = null;
+var allRows   = [];      // all generated rows (used for CSV + RM filter)
+
+// ══════════════════════════════════════════════════════════════
+//  Helpers
+// ══════════════════════════════════════════════════════════════
+function isExcluded(route) {
+  if (EXCLUDED.some(function(x) { return route.indexOf(x) !== -1; })) return true;
+  // Hide VR routes — they belong to a different department
+  if (route.indexOf('-VR') !== -1 || route.indexOf('_VR') !== -1 || /\bVR\b/.test(route)) return true;
+  return false;
+}
+
+function isPhysicalLoc(label, type) {
+  if ((type || '').trim() !== 'STACKING_AREA') return false;
+  var u = (label || '').toUpperCase();
+  return LABEL_PREFIXES.some(function(p) { return u.indexOf(p) === 0; });
+}
+
+function areaOrder(label) {
+  var u = (label || '').toUpperCase();
+  if (u.indexOf('BOX-')  === 0) return 0;
+  if (u.indexOf('FLAT-') === 0) return 1;
+  if (u.indexOf('BG-')   === 0) return 2;
+  return 3;
+}
+
+function locClass(label) {
+  var u = (label || '').toUpperCase();
+  if (u.indexOf('BOX-')  === 0) return 'loc-box';
+  if (u.indexOf('FLAT-') === 0) return 'loc-flat';
+  if (u.indexOf('BG-')   === 0) return 'loc-bg';
+  return 'loc-other';
+}
+
+function stripOrigin(route) {
+  var i = route.indexOf('>');
+  return i !== -1 ? route.slice(i + 1).trim() : route;
+}
+
+function stripPrefix(route) {
+  var prefixes = ['SEA-AMZL-', 'SEA-', 'AIR-EMA2-', 'AMXL-', 'AMZL-', 'LH-'];
+  for (var i = 0; i < prefixes.length; i++) {
+    if (route.indexOf(prefixes[i]) === 0) return route.slice(prefixes[i].length);
+  }
+  return route;
+}
+
+function toMins(t) {
+  if (!t) return -1;
+  var p = t.split(':');
+  return parseInt(p[0], 10) * 60 + parseInt(p[1], 10);
+}
+
+function parseCpt(raw) {
+  if (!raw || raw.trim() === '-') return null;
+  var m = raw.match(/(\d{1,2}):(\d{2})/);
+  return m ? String(m[1]).padStart(2, '0') + ':' + m[2] : null;
+}
+
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ══════════════════════════════════════════════════════════════
+//  File upload
+// ══════════════════════════════════════════════════════════════
+function onFile(type) {
+  var inp = type === 'dock' ? 'dockFile' : 'dataFile';
+  var sid = type === 'dock' ? 'dock-status' : 'data-status';
+  var file = document.getElementById(inp).files[0];
+  if (!file) return;
+  var el = document.getElementById(sid);
+  el.className = ''; el.textContent = 'Reading…';
+  Papa.parse(file, {
+    header: true, skipEmptyLines: true,
+    complete: function(r) {
+      if (type === 'dock') dockData  = r.data;
+      else                 allocData = r.data;
+      el.className   = 'ok';
+      el.textContent = '✓ ' + r.data.length + ' rows loaded';
+      checkReady();
+    },
+    error: function() { el.className = 'err'; el.textContent = 'Error reading file'; }
+  });
+}
+
+function checkReady() {
+  if (dockData && allocData) loadCptTimes();
+}
+
+// ══════════════════════════════════════════════════════════════
+//  CPT pill population
+// ══════════════════════════════════════════════════════════════
+function loadCptTimes() {
+  var dKeys  = Object.keys(dockData[0] || {});
+  var colRt  = dKeys[8];   // Sort/Route
+  var colCpt = dKeys[18];  // CPT
+
+  // Collect all unique CPT times from dock CSV
+  var times = {};
+  dockData.forEach(function(row) {
+    var rt  = (row[colRt]  || '').trim();
+    var raw = (row[colCpt] || '').trim();
+    if (!rt || rt === '-' || !raw || raw === '-') return;
+    var cpt = parseCpt(raw);
+    if (cpt) times[cpt] = true;
+  });
+
+  var sorted = Object.keys(times).sort(function(a, b) { return toMins(a) - toMins(b); });
+
+  if (sorted.length === 0) {
+    document.getElementById('cpt-pills').innerHTML = '<span class="pill-hint">No CPT times found in dock file</span>';
+    return;
+  }
+
+  var html = '';
+  sorted.forEach(function(t, i) {
+    html += '<input type="checkbox" class="cpt-pill-cb" id="cp' + i + '" value="' + t + '">'
+          + '<label for="cp' + i + '">' + t + '</label>';
+  });
+  document.getElementById('cpt-pills').innerHTML = html;
+
+  // Enable all controls
+  ['btn-day','btn-night','btn-all','btn-none','btn-gen'].forEach(function(id) {
+    document.getElementById(id).disabled = false;
+  });
+
+  document.getElementById('status').textContent =
+    sorted.length + ' CPT times found — tick the ones you want then click Generate.';
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Tick controls
+// ══════════════════════════════════════════════════════════════
+function selectShift(shift) {
+  document.querySelectorAll('.cpt-pill-cb').forEach(function(cb) {
+    var m = toMins(cb.value);
+    cb.checked = shift === 'day'
+      ? (m >= 7 * 60 && m < 18 * 60)
+      : (m >= 18 * 60 || m < 5 * 60);
+  });
+}
+
+function selectAll(state) {
+  document.querySelectorAll('.cpt-pill-cb').forEach(function(cb) { cb.checked = state; });
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Generate
+// ══════════════════════════════════════════════════════════════
+function generate() {
+  // Collect checked CPT times into a lookup set
+  var selected = {};
+  document.querySelectorAll('.cpt-pill-cb:checked').forEach(function(cb) {
+    selected[cb.value] = true;
+  });
+
+  if (Object.keys(selected).length === 0) {
+    document.getElementById('status').textContent = 'Tick at least one CPT time first.';
+    return;
+  }
+
+  buildRows(selected);
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Core: build rows
+// ══════════════════════════════════════════════════════════════
+function buildRows(cptSet) {
+  var st = document.getElementById('status');
+  st.textContent = 'Building…';
+
+  try {
+    var dKeys  = Object.keys(dockData[0] || {});
+    var colRt  = dKeys[8];
+    var colCpt = dKeys[18];
+
+    // ── 1. Collect matching route+CPT pairs ──────────────────
+    var seen = {};
+    dockData.forEach(function(row) {
+      var rt  = (row[colRt]  || '').trim();
+      var raw = (row[colCpt] || '').trim();
+      if (!rt || rt === '-' || !raw || raw === '-') return;
+      var cpt = parseCpt(raw);
+      if (!cpt || !cptSet[cpt]) return;
+      var noOrigin = stripOrigin(rt);
+      if (isExcluded(noOrigin)) return;
+      var key = rt + '|' + cpt;
+      if (!seen[key]) seen[key] = { fullRoute: rt, noOrigin: noOrigin, cpt: cpt };
+    });
+
+    var pairs = Object.keys(seen).map(function(k) { return seen[k]; });
+    if (pairs.length === 0) {
+      st.textContent = 'No routes found for the selected CPT times.';
+      document.getElementById('output').innerHTML = '';
+      return;
+    }
+
+    // ── 2. Build Lane → entries map from allocation CSV ──────
+    var laneMap  = {};
+    var laneKeys = {};
+    allocData.forEach(function(row) {
+      var lane   = (row['Lane']            || '').trim();
+      var filter = (row['Stacking Filter'] || '').trim();
+      var label  = (row['Resource Label']  || '').trim();
+      var type   = (row['Resource Type']   || '').trim();
+      if (!lane || !label || !isPhysicalLoc(label, type)) return;
+      var dk = filter + '|||' + label;
+      if (!laneKeys[lane]) laneKeys[lane] = {};
+      if (laneKeys[lane][dk]) return;
+      laneKeys[lane][dk] = true;
+      if (!laneMap[lane]) laneMap[lane] = [];
+      laneMap[lane].push({ filter: filter, label: label });
+    });
+
+    // ── 3. Match routes → allocation entries ─────────────────
+    var rows = [];
+    pairs.forEach(function(p) {
+      var entries = [];
+
+      if (laneMap[p.fullRoute]) {
+        entries = laneMap[p.fullRoute].slice();
+      } else {
+        // Fallback: fuzzy lane match
+        var stripped = p.noOrigin;
+        Object.keys(laneMap).forEach(function(lane) {
+          var ls = stripOrigin(lane);
+          if (ls === stripped || ls.indexOf(stripped) !== -1 || stripped.indexOf(ls) !== -1) {
+            laneMap[lane].forEach(function(e) { entries.push(e); });
+          }
+        });
+        // Deduplicate fallback results
+        var seen2 = {};
+        entries = entries.filter(function(e) {
+          var k = e.filter + '|' + e.label;
+          return seen2[k] ? false : (seen2[k] = true);
+        });
+      }
+
+      // Skip routes with no sort locations — they belong to another department or have no data
+      if (entries.length === 0) return;
+
+      var displayName = stripPrefix(p.noOrigin);
+
+      if (isRoyalMail(displayName)) {
+        // For RM routes: split entries by Sort Filter — one row per filter
+        var filterGroups = {};
+        var filterOrder  = [];
+        entries.forEach(function(e) {
+          if (!filterGroups[e.filter]) { filterGroups[e.filter] = []; filterOrder.push(e.filter); }
+          filterGroups[e.filter].push(e);
+        });
+        filterOrder.forEach(function(filter) {
+          var grp = filterGroups[filter].slice();
+          grp.sort(function(a, b) {
+            var oa = areaOrder(a.label), ob = areaOrder(b.label);
+            return oa !== ob ? oa - ob : a.label.localeCompare(b.label);
+          });
+          rows.push({ displayName: displayName, rmSortFilter: filter, cpt: p.cpt, entries: grp });
+        });
+      } else {
+        // Sort: BOX → FLAT → BG, then alphabetical within each group
+        entries.sort(function(a, b) {
+          var oa = areaOrder(a.label), ob = areaOrder(b.label);
+          return oa !== ob ? oa - ob : a.label.localeCompare(b.label);
+        });
+        rows.push({ displayName: displayName, cpt: p.cpt, entries: entries });
+      }
+    });
+
+    // Sort by CPT time, then route name
+    rows.sort(function(a, b) {
+      var d = toMins(a.cpt) - toMins(b.cpt);
+      return d !== 0 ? d : a.displayName.localeCompare(b.displayName);
+    });
+
+    allRows = rows;
+    document.getElementById('btn-csv').disabled = false;
+    buildRMPills(rows);
+    renderTable(rows);
+
+  } catch(err) {
+    st.textContent = 'Error: ' + err.message;
+    console.error(err);
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Royal Mail helpers
+// ══════════════════════════════════════════════════════════════
+function isRoyalMail(displayName) {
+  return /\bRM-/i.test(displayName);
+}
+
+function buildRMPills(rows) {
+  var filters = [];
+  var seen = {};
+  rows.forEach(function(r) {
+    if (r.rmSortFilter && !seen[r.rmSortFilter]) {
+      seen[r.rmSortFilter] = true;
+      filters.push(r.rmSortFilter);
+    }
+  });
+
+  var card = document.getElementById('rm-card');
+  var pillsEl = document.getElementById('rm-pills');
+
+  if (filters.length === 0) {
+    card.style.display = 'none';
+    return;
+  }
+
+  filters.sort(function(a, b) { return a.localeCompare(b); });
+
+  var html = '';
+  filters.forEach(function(filter, i) {
+    var id = 'rmp' + i;
+    html += '<input type="checkbox" class="cpt-pill-cb rm-pill-cb" id="' + id + '" value="' + esc(filter) + '" checked onchange="renderTable(allRows)">'
+          + '<label for="' + id + '">' + esc(filter) + '</label>';
+  });
+  pillsEl.innerHTML = html;
+  card.style.display = 'block';
+}
+
+function selectAllRM(state) {
+  document.querySelectorAll('.rm-pill-cb').forEach(function(cb) { cb.checked = state; });
+  renderTable(allRows);
+}
+
+function getCheckedRM() {
+  var checked = {};
+  document.querySelectorAll('.rm-pill-cb:checked').forEach(function(cb) { checked[cb.value] = true; });
+  return checked;
+}
+
+function isRMRowVisible(r, checkedRM) {
+  if (!r.rmSortFilter) return true;          // not an RM row — always show
+  return !!checkedRM[r.rmSortFilter];        // RM row — show only if its filter is ticked
+}
+
+// ══════════════════════════════════════════════════════════════
+//  CSV Download
+// ══════════════════════════════════════════════════════════════
+function downloadCSV() {
+  if (!allRows.length) {
+    alert('Generate the CPT list first.');
+    return;
+  }
+  var checkedRM = getCheckedRM();
+  var visibleRows = allRows.filter(function(r) { return isRMRowVisible(r, checkedRM); });
+  var lines = ['"CPT","Route","Sort Filter","Location"'];
+  visibleRows.forEach(function(row) {
+    row.entries.forEach(function(e) {
+      lines.push(
+        '"' + row.cpt + '",' +
+        '"' + row.displayName.replace(/"/g, '""') + '",' +
+        '"' + e.filter.replace(/"/g, '""') + '",' +
+        '"' + e.label.replace(/"/g, '""') + '"'
+      );
+    });
+  });
+  var blob = new Blob([lines.join('\r\n')], { type: 'text/csv' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'CPT_List.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Render
+// ══════════════════════════════════════════════════════════════
+function renderTable(rows) {
+  // Apply Royal Mail filter — only include RM sort filters whose checkbox is ticked
+  var checkedRM = getCheckedRM();
+  var filtered = rows.filter(function(r) { return isRMRowVisible(r, checkedRM); });
+
+  if (filtered.length === 0) {
+    document.getElementById('output').innerHTML = '<p style="color:#888;font-size:.9em;">No routes to display. Toggle Royal Mail back on or adjust your CPT selection.</p>';
+    document.getElementById('status').textContent = '';
+    return;
+  }
+
+  rows = filtered;
+  var html = '<table>'
+    + '<thead><tr>'
+    + '<th style="width:16%">Route</th>'
+    + '<th style="width:42%">Sort Filter</th>'
+    + '<th style="width:42%">Location</th>'
+    + '</tr></thead><tbody>';
+
+  var lastCpt = null;
+  rows.forEach(function(row) {
+    if (row.cpt !== lastCpt) {
+      html += '<tr class="cpt-div"><td colspan="3">&#9654; CPT ' + esc(row.cpt) + '</td></tr>';
+      lastCpt = row.cpt;
+    }
+
+    {
+      // For RM rows, show the Sort Filter as the route cell label (that's the operative identifier)
+      var routeLabel = row.rmSortFilter ? row.rmSortFilter : row.displayName;
+      html += '<tr class="data-row route-start">'
+            + '<td class="route-cell" rowspan="' + row.entries.length + '" title="' + esc(row.displayName) + '">' + esc(routeLabel) + '</td>'
+            + '<td class="filter-cell">' + esc(row.entries[0].filter) + '</td>'
+            + '<td class="' + locClass(row.entries[0].label) + '">' + esc(row.entries[0].label) + '</td>'
+            + '</tr>';
+      for (var i = 1; i < row.entries.length; i++) {
+        html += '<tr class="data-row">'
+              + '<td class="filter-cell">' + esc(row.entries[i].filter) + '</td>'
+              + '<td class="' + locClass(row.entries[i].label) + '">' + esc(row.entries[i].label) + '</td>'
+              + '</tr>';
+      }
+    }
+  });
+
+  html += '</tbody></table>';
+  document.getElementById('output').innerHTML = html;
+  document.getElementById('status').textContent = '';
+}
+</script>
+</body>
+</html>
